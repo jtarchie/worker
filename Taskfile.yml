@@ -3,6 +3,7 @@ version: '3'
 tasks:
   format:
     cmds:
+    - deno fmt README.md
     - gofmt -w .
   lint: golangci-lint run --fix --timeout "10m"
   test-race: go test -cover -race ./...
