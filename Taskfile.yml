@@ -1,0 +1,15 @@
+version: '3'
+
+tasks:
+  format:
+    cmds:
+    - gofmt -w .
+  lint: golangci-lint run --fix --timeout "10m"
+  test-race: go test -cover -race ./...
+  test: go test ./...
+  default:
+    cmds:
+    - task: format
+    - task: lint
+    - task: test-race
+    - task: test
