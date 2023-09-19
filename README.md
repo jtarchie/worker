@@ -19,7 +19,7 @@ This library does not currently support:
 Here are some examples to demonstrate how to use the Worker library:
 
 ```bash
-go get github.com/jtarchie/worke
+go get github.com/jtarchie/worker
 ```
 
 ### Basic Usage
