@@ -1,6 +1,9 @@
 # Worker
 
-The purpose of this library is to manage a queue of work and utilize `N` workers (via goroutines) to process the tasks concurrently. The queue has a specified size, and when adding a task to the queue, it will block until a worker has completed a task and freed up space in the queue.
+The purpose of this library is to manage a queue of work and utilize `N` workers
+(via goroutines) to process the tasks concurrently. The queue has a specified
+size, and when adding a task to the queue, it will block until a worker has
+completed a task and freed up space in the queue.
 
 ## Features
 
@@ -11,6 +14,7 @@ The purpose of this library is to manage a queue of work and utilize `N` workers
 ## Limitations
 
 This library does not currently support:
+
 - Timeout/context for a worker.
 - Retry mechanism.
 
@@ -55,7 +59,8 @@ w.Enqueue(100)
 
 ### Distributing Work Across Workers
 
-If you have multiple tasks to be processed, you can distribute them across different workers.
+If you have multiple tasks to be processed, you can distribute them across
+different workers.
 
 ```go
 count, workers := int32(0), make(chan int, 10)
@@ -76,7 +81,8 @@ for i := 0; i < 10; i++ {
 
 ### Handling Large Amounts of Work
 
-For processing a large number of tasks with different queue and worker configurations:
+For processing a large number of tasks with different queue and worker
+configurations:
 
 ```go
 w := worker.New[int](10, 10, func(index, value int) {

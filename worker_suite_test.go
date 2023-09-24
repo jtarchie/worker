@@ -1,10 +1,9 @@
 package worker_test
 
 import (
-	"context"
-	"fmt"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jtarchie/worker"
 	. "github.com/onsi/ginkgo/v2"
@@ -19,7 +18,7 @@ func TestWorker(t *testing.T) {
 var _ = Describe("Worker", func() {
 	It("can process work", func() {
 		count := int32(0)
-		w := worker.New[int](1, 1, func(index, value int) {
+		pool := worker.New[int](1, 1, func(index, value int) {
 			defer GinkgoRecover()
 
 			Expect(index).To(Equal(1))
@@ -27,9 +26,9 @@ var _ = Describe("Worker", func() {
 
 			atomic.AddInt32(&count, 1)
 		})
-		defer w.Close()
+		defer pool.Close()
 
-		w.Enqueue(100)
+		Expect(pool.Enqueue(100)).To(BeTrue())
 
 		Eventually(func() int32 {
 			return atomic.LoadInt32(&count)
@@ -38,36 +37,36 @@ var _ = Describe("Worker", func() {
 
 	When("a panic happens on a worker", func() {
 		It("does not bring anything down", func() {
-			count := int32(0)
-			w := worker.New[int](10, 1, func(index, value int) {
+			var (
+				count      atomic.Int32
+				recoveries atomic.Int32
+			)
+			pool := worker.New[int](10, 1, func(index, value int) {
 				defer func() {
 					if r := recover(); r != nil {
-						fmt.Println("Recovered in f", r)
+						recoveries.Add(1)
 					}
 				}()
 
-				atomic.AddInt32(&count, 1)
+				count.Add(1)
 
 				if value == 100 {
 					panic("a problem has entered the chat")
 				}
 			})
-			defer w.Close()
+			defer pool.Close()
 
-			w.Enqueue(100)
-			w.Enqueue(101)
+			Expect(pool.Enqueue(100)).To(BeTrue())
+			Expect(pool.Enqueue(101)).To(BeTrue())
 
-			Eventually(func() int32 {
-				return atomic.LoadInt32(&count)
-			}).Should(BeEquivalentTo(2))
+			Eventually(count.Load).Should(BeEquivalentTo(2))
+			Eventually(recoveries.Load).Should(BeEquivalentTo(1))
 		})
 	})
 
 	It("can process work across workers", func() {
 		count, workers := int32(0), make(chan int, 10)
-		ctx, cancel := context.WithCancel(context.Background())
-
-		w := worker.New[int](1, 10, func(index, value int) {
+		pool := worker.New[int](1, 10, func(index, value int) {
 			// keep track of how many workers have been used
 			workers <- index
 
@@ -75,15 +74,13 @@ var _ = Describe("Worker", func() {
 			atomic.AddInt32(&count, 1)
 
 			// block so other, this worker does not pick up more work
-			for range ctx.Done() {
-			}
+			time.Sleep(time.Millisecond)
 		})
-		defer w.Close()
-		defer cancel()
+		defer pool.Close()
 
 		go func() {
 			for i := 0; i < 10; i++ {
-				w.Enqueue(i)
+				Expect(pool.Enqueue(i)).To(BeTrue())
 			}
 		}()
 
@@ -91,7 +88,6 @@ var _ = Describe("Worker", func() {
 			return atomic.LoadInt32(&count)
 		}).Should(BeEquivalentTo(10))
 
-		cancel()
 		close(workers)
 
 		usedWorkers := []int{}
@@ -105,14 +101,14 @@ var _ = Describe("Worker", func() {
 
 	DescribeTable("handling a lot of work", func(queueSize, workerSize, elements int) {
 		count := int32(0)
-		w := worker.New[int](queueSize, workerSize, func(index, value int) {
+		pool := worker.New[int](queueSize, workerSize, func(index, value int) {
 			atomic.AddInt32(&count, 1)
 		})
-		defer w.Close()
+		defer pool.Close()
 
 		go func() {
 			for i := 0; i < elements; i++ {
-				w.Enqueue(i)
+				Expect(pool.Enqueue(i)).To(BeTrue())
 			}
 		}()
 
@@ -127,4 +123,33 @@ var _ = Describe("Worker", func() {
 		Entry("10,10,1000", 10, 10, 1_000),
 		Entry("10,10,1000", 10, 10, 100_000),
 	)
+
+	When("providing a timeout", func() {
+		It("can handle a timeout for queueing", func() {
+			var neverGetHere atomic.Bool
+			neverGetHere.Store(true)
+
+			pool := worker.New[int](0, 0, func(index, value int) {
+				neverGetHere.Store(false)
+			})
+
+			Expect(pool.Enqueue(1, worker.WithTimeout(time.Millisecond))).To(BeFalse())
+
+			Consistently(neverGetHere.Load).Should(BeTrue())
+		})
+
+		It("will not queue before the timeout", func() {
+			var count atomic.Int32
+			pool := worker.New[int](1, 1, func(index, value int) {
+				count.Add(1)
+				time.Sleep(time.Second)
+			})
+
+			Eventually(func() bool {
+				return pool.Enqueue(1, worker.WithTimeout(time.Millisecond))
+			}).Should(BeFalse())
+
+			Eventually(count.Load).Should(BeEquivalentTo(1))
+		})
+	})
 })
