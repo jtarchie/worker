@@ -17,22 +17,20 @@ func TestWorker(t *testing.T) {
 
 var _ = Describe("Worker", func() {
 	It("can process work", func() {
-		count := int32(0)
+		var count atomic.Int32
 		pool := worker.New[int](1, 1, func(index, value int) {
 			defer GinkgoRecover()
 
 			Expect(index).To(Equal(1))
 			Expect(value).To(Equal(100))
 
-			atomic.AddInt32(&count, 1)
+			count.Add(1)
 		})
 		defer pool.Close()
 
 		Expect(pool.Enqueue(100)).To(BeTrue())
 
-		Eventually(func() int32 {
-			return atomic.LoadInt32(&count)
-		}).Should(BeEquivalentTo(1))
+		Eventually(count.Load).Should(BeEquivalentTo(1))
 	})
 
 	When("a panic happens on a worker", func() {
@@ -65,13 +63,14 @@ var _ = Describe("Worker", func() {
 	})
 
 	It("can process work across workers", func() {
-		count, workers := int32(0), make(chan int, 10)
+		var count atomic.Int32
+		workers := make(chan int, 10)
 		pool := worker.New[int](1, 10, func(index, value int) {
 			// keep track of how many workers have been used
 			workers <- index
 
 			// count how many times this function is called
-			atomic.AddInt32(&count, 1)
+			count.Add(1)
 
 			// block so other, this worker does not pick up more work
 			time.Sleep(time.Millisecond)
@@ -84,9 +83,7 @@ var _ = Describe("Worker", func() {
 			}
 		}()
 
-		Eventually(func() int32 {
-			return atomic.LoadInt32(&count)
-		}).Should(BeEquivalentTo(10))
+		Eventually(count.Load).Should(BeEquivalentTo(10))
 
 		close(workers)
 
@@ -100,9 +97,9 @@ var _ = Describe("Worker", func() {
 	})
 
 	DescribeTable("handling a lot of work", func(queueSize, workerSize, elements int) {
-		count := int32(0)
+		var count atomic.Int32
 		pool := worker.New[int](queueSize, workerSize, func(index, value int) {
-			atomic.AddInt32(&count, 1)
+			count.Add(1)
 		})
 		defer pool.Close()
 
@@ -112,9 +109,7 @@ var _ = Describe("Worker", func() {
 			}
 		}()
 
-		Eventually(func() int32 {
-			return atomic.LoadInt32(&count)
-		}).Should(BeEquivalentTo(elements))
+		Eventually(count.Load).Should(BeEquivalentTo(elements))
 	},
 		Entry("1,1,100", 1, 1, 100),
 		Entry("1,1,1000", 1, 1, 100),
