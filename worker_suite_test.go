@@ -127,6 +127,7 @@ var _ = Describe("Worker", func() {
 			pool := worker.New[int](0, 0, func(index, value int) {
 				neverGetHere.Store(false)
 			})
+			defer pool.Close()
 
 			Expect(pool.Enqueue(1, worker.WithTimeout(time.Millisecond))).To(BeFalse())
 
@@ -139,6 +140,7 @@ var _ = Describe("Worker", func() {
 				count.Add(1)
 				time.Sleep(time.Second)
 			})
+			defer pool.Close()
 
 			Eventually(func() bool {
 				return pool.Enqueue(1, worker.WithTimeout(time.Millisecond))
