@@ -10,12 +10,13 @@ completed a task and freed up space in the queue.
 - Concurrently processes tasks using multiple workers (goroutines).
 - Fixed-size queue to manage tasks.
 - Blocks when adding tasks if the queue is full.
+- Specify an optional timeout for work to be queued.
 
 ## Limitations
 
 This library does not currently support:
 
-- Timeout/context for a worker.
+- Context for a worker.
 - Retry mechanism.
 
 ## Usage
