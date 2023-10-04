@@ -12,88 +12,71 @@ completed a task and freed up space in the queue.
 - Blocks when adding tasks if the queue is full.
 - Specify an optional timeout for work to be queued.
 
-## Limitations
+### Limitations
 
 This library does not currently support:
 
-- Context for a worker.
+- `context` for a worker.
+- `context` for a enqueuing.
 - Retry mechanism.
+- Does not return a value or error
 
 ## Usage
 
-Here are some examples to demonstrate how to use the Worker library:
+Here is how to use the library:
 
 ```bash
 go get github.com/jtarchie/worker
 ```
 
-### Basic Usage
+Within in code.
 
 ```go
 count := int32(0)
-w := worker.New[int](1, 1, func(index, value int) {
+pool := worker.New[int](1, 1, func(index, value int) {
 	atomic.AddInt32(&count, 1)
 })
-defer w.Close()
-w.Enqueue(100)
+defer pool.Close()
+
+pool.Enqueue(100)
 ```
 
-### Handling Panics in Workers
+This enqueues a single value for a worker to process, incrementing the count
+each time a worker processes a task.
 
-Ensure your application remains robust even when panics occur within a worker.
+The type int indicates the kind of value that can be enqueued. If a different
+value type is passed to Enqueue, the compiler will report an error.
 
 ```go
-w := worker.New[int](10, 1, func(index, value int) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in worker:", r)
-		}
-	}()
-
-	if value == 100 {
-		panic("a problem has entered the chat")
-	}
-})
-defer w.Close()
-w.Enqueue(100)
+// this results in a compiler type error
+pool.Enqueue("some string")
 ```
 
-### Distributing Work Across Workers
+The three arguments for `worker.New`` are:
 
-If you have multiple tasks to be processed, you can distribute them across
-different workers.
+1. Buffered queue size: This determines how many values can be enqueued without
+   blocking. Once this buffer is filled, any call to Enqueue will block until
+   there's space in the queue.
+2. Number of workers in the pool: Corresponds to one worker per goroutine. These
+   are cleaned up upon calling Close, which also ensures that all tasks in the
+   queue are processed by the running workers.
+3. Function to process the enqueued value:
+   - index is the count of processed values. -value is the enqueued item of type
+     T passed to the generic.
+
+You can fine-tune these values for your pool:
 
 ```go
-count, workers := int32(0), make(chan int, 10)
-ctx, cancel := context.WithCancel(context.Background())
-
-w := worker.New[int](1, 10, func(index, value int) {
-	workers <- index
-	atomic.AddInt32(&count, 1)
-	for range ctx.Done() {}
-})
-defer w.Close()
-defer cancel()
-
-for i := 0; i < 10; i++ {
-	w.Enqueue(i)
-}
+pool := worker.New(
+	100, // buffered queue is size 100
+	10,  // number of goroutines to distribute work across 
+	func(index int, value T) {
+		// do some work on `value`,
+		// T is the generic type
+	},
+)
 ```
 
-### Handling Large Amounts of Work
-
-For processing a large number of tasks with different queue and worker
-configurations:
-
-```go
-w := worker.New[int](10, 10, func(index, value int) {
-	atomic.AddInt32(&count, 1)
-})
-defer w.Close()
-
-for i := 0; i < 100_000; i++ {
-	w.Enqueue(i)
-}
-```
-
-For more intricate examples and edge cases, please refer to the provided tests.
+It's essential to wait for your worker pool to complete by calling Close. This
+ensures that workers finalize their tasks and shut down correctly. Using the
+defer pattern is highly recommended.
