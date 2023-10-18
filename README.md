@@ -52,16 +52,16 @@ value type is passed to Enqueue, the compiler will report an error.
 pool.Enqueue("some string")
 ```
 
-The three arguments for `worker.New`` are:
+The three arguments for `worker.New` are:
 
-1. Buffered queue size: This determines how many values can be enqueued without
-   blocking. Once this buffer is filled, any call to Enqueue will block until
+1. Buffered queue size determines how many values can be enqueued without
+   blocking. Once this buffer is filled, any call to Enqueue will be blocked until
    there's space in the queue.
 2. Number of workers in the pool: Corresponds to one worker per goroutine. These
-   are cleaned up upon calling Close, which also ensures that all tasks in the
-   queue are processed by the running workers.
+   are cleaned up upon calling Close, ensuring that the running workers process all tasks in the
+queue.
 3. Function to process the enqueued value:
-   - index is the count of processed values. -value is the enqueued item of type
+   - `index` is the worker being run on. `value` is the enqueued item of type
      T passed to the generic.
 
 You can fine-tune these values for your pool:
