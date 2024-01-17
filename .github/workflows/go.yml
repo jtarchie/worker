@@ -15,9 +15,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: denoland/setup-deno@v1
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: '1.21'
         check-latest: true
         cache: true
     - name: Install golangci-lint
@@ -33,9 +33,5 @@ jobs:
         repo: go-task/task
         token: ${{ secrets.GITHUB_TOKEN }}
         cache: enable
-    - uses: engineerd/configurator@v0.0.10
-      with:
-        name: minio
-        url: https://dl.min.io/server/minio/release/linux-amd64/minio
     - name: Task
       run: task
