@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"runtime"
 	"sync"
 	"time"
 )
@@ -77,6 +78,7 @@ func (w *Worker[T]) Enqueue(item T, options ...WithOption) bool {
 }
 
 func (w *Worker[T]) Close() {
+	runtime.Gosched()
 	close(w.queue)
 	w.wait.Wait()
 }
