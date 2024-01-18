@@ -33,11 +33,10 @@ func main() {
 
 		<-waiter
 	})
+	defer consumer.Close()
+	defer producer.Close()
 	
 	for i := 0; i < 10; i++ {
 		producer.Enqueue("https://example.com")
 	}
-
-	producer.Close()
-	consumer.Close()
 }
