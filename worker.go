@@ -57,15 +57,13 @@ func WithTimeout(duration time.Duration) WithOption {
 }
 
 func (w *Worker[T]) Enqueue(item T, options ...WithOption) bool {
-	enqueueSettings := &enqueueOption{}
-	for _, option := range options {
-		option(enqueueSettings)
+	const theFuture = time.Hour * 24 * 365 * 100 // 100 years in the future
+	enqueueSettings := &enqueueOption{
+		timeout: theFuture,
 	}
 
-	if enqueueSettings.timeout == 0 {
-		w.queue <- item
-
-		return true
+	for _, option := range options {
+		option(enqueueSettings)
 	}
 
 	expiration := time.After(enqueueSettings.timeout)
