@@ -31,12 +31,12 @@ func New[T any](
 
 func (w *Worker[T]) init() {
 	for index := 1; index <= w.size; index++ {
+		w.wait.Add(1)
 		go w.startWorker(index)
 	}
 }
 
 func (w *Worker[T]) startWorker(index int) {
-	w.wait.Add(1)
 	defer w.wait.Done()
 
 	for item := range w.queue {
@@ -76,6 +76,8 @@ func (w *Worker[T]) Enqueue(item T, options ...WithOption) bool {
 }
 
 func (w *Worker[T]) Close() {
+	// this is to prevent exhaustion from init()
+	// with an immediate `defer w.Close()` that might be done
 	runtime.Gosched()
 	close(w.queue)
 	w.wait.Wait()
