@@ -66,9 +66,11 @@ func (w *Worker[T]) Enqueue(item T, options ...WithOption) bool {
 		option(enqueueSettings)
 	}
 
-	expiration := time.After(enqueueSettings.timeout)
+	expiration := time.NewTimer(enqueueSettings.timeout)
+	defer expiration.Stop()
+
 	select {
-	case <-expiration:
+	case <-expiration.C:
 		return false
 	case w.queue <- item:
 		return true
