@@ -7,7 +7,7 @@ tasks:
     - gofmt -w .
   lint: golangci-lint run --fix --timeout "10m"
   test-race: go test -cover -race ./...
-  test: go test ./...
+  test: go test ./... -bench . -benchmem
   default:
     cmds:
     - task: format
