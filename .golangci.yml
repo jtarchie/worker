@@ -1,22 +1,7 @@
+version: "2"
 run:
-  skip-files: []
+  go: "1.24"
 linters:
-  enable-all: true
+  default: standard
   disable:
-  - depguard
-  - exhaustruct
-  - paralleltest
-  - gomoddirectives
-  - revive
-
-  # linters deprecated
-  - deadcode
-  - exhaustivestruct
-  - golint
-  - ifshort
-  - interfacer
-  - nosnakecase
-  - maligned
-  - scopelint
-  - structcheck
-  - varcheck
+    - depguard

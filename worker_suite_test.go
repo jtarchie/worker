@@ -1,6 +1,7 @@
 package worker_test
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -147,6 +148,85 @@ var _ = Describe("Worker", func() {
 			}).Should(BeFalse())
 
 			Eventually(count.Load).Should(BeEquivalentTo(1))
+		})
+	})
+
+	When("using context", func() {
+		It("can create a worker with context", func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			var count atomic.Int32
+			pool := worker.NewWithContext[int](ctx, 1, 1, func(index, value int) {
+				count.Add(1)
+			})
+			defer pool.Close()
+
+			Expect(pool.Enqueue(100)).To(BeTrue())
+			Eventually(count.Load).Should(BeEquivalentTo(1))
+		})
+
+		It("stops workers when context is cancelled", func() {
+			ctx, cancel := context.WithCancel(context.Background())
+
+			var count atomic.Int32
+			pool := worker.NewWithContext[int](ctx, 10, 2, func(index, value int) {
+				count.Add(1)
+				time.Sleep(50 * time.Millisecond)
+			})
+
+			// Enqueue some work
+			for i := range 5 {
+				Expect(pool.Enqueue(i)).To(BeTrue())
+			}
+
+			// Wait for some processing
+			Eventually(count.Load).Should(BeNumerically(">=", 1))
+
+			// Cancel context
+			cancel()
+
+			// Close should complete quickly
+			done := make(chan struct{})
+			go func() {
+				pool.Close()
+				close(done)
+			}()
+
+			Eventually(done, 5*time.Second).Should(BeClosed())
+		})
+
+		It("can use WithContext option for enqueue", func() {
+			pool := worker.New[int](0, 0, func(index, value int) {
+				// never called
+			})
+			defer pool.Close()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // Cancel immediately
+
+			// Enqueue should fail because context is cancelled
+			Expect(pool.Enqueue(1, worker.WithContext(ctx))).To(BeFalse())
+		})
+
+		It("provides Done channel", func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			pool := worker.NewWithContext[int](ctx, 1, 1, func(index, value int) {})
+
+			// Done channel should not be closed yet
+			select {
+			case <-pool.Done():
+				Fail("Done channel should not be closed")
+			default:
+				// expected
+			}
+
+			cancel()
+
+			// Done channel should be closed after cancel
+			Eventually(pool.Done()).Should(BeClosed())
+
+			pool.Close()
 		})
 	})
 })
