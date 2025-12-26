@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"runtime"
 	"sync"
 	"time"
 )
@@ -9,7 +8,6 @@ import (
 type Worker[T any] struct {
 	process func(int, T)
 	queue   chan T
-	size    int
 	wait    *sync.WaitGroup
 }
 
@@ -21,19 +19,16 @@ func New[T any](
 	pool := &Worker[T]{
 		process: process,
 		queue:   make(chan T, queueSize),
-		size:    workerSize,
 		wait:    &sync.WaitGroup{},
 	}
-	go pool.init()
+
+	// Start workers synchronously to avoid race between init and Close
+	for index := 1; index <= workerSize; index++ {
+		pool.wait.Add(1)
+		go pool.startWorker(index)
+	}
 
 	return pool
-}
-
-func (w *Worker[T]) init() {
-	for index := 1; index <= w.size; index++ {
-		w.wait.Add(1)
-		go w.startWorker(index)
-	}
 }
 
 func (w *Worker[T]) startWorker(index int) {
@@ -78,9 +73,6 @@ func (w *Worker[T]) Enqueue(item T, options ...WithOption) bool {
 }
 
 func (w *Worker[T]) Close() {
-	// this is to prevent exhaustion from init()
-	// with an immediate `defer w.Close()` that might be done
-	runtime.Gosched()
 	close(w.queue)
 	w.wait.Wait()
 }
